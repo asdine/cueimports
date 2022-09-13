@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -374,12 +375,13 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 			return filepath.SkipDir
 		}
 
-		// parse the file again, this time parsing the whole file
+		// this time parse the whole file
 		f, err = parser.ParseFile(path, content)
 		if err != nil {
 			return err
 		}
 
+		// look for one of the identifiers in the file
 		ast.Walk(f, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.Ident:
@@ -390,7 +392,13 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 						if err != nil {
 							return false
 						}
-						resolved[pkgName] = filepath.Join(modName, rel)
+						if strings.HasPrefix(rel, "cue.mod/") {
+							rel = strings.TrimPrefix(rel, "cue.mod/pkg/")
+							rel = strings.TrimPrefix(rel, "cue.mod/usr/")
+							resolved[pkgName] = rel
+						} else {
+							resolved[pkgName] = filepath.Join(modName, rel)
+						}
 						delete(unresolved, pkgName)
 					}
 				}
@@ -481,15 +489,40 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 		return true
 	}, nil)
 
+	// sort the imports by group
+	// 1. standard library
+	// 2. other packages
+	// TODO separate local packages from cue.mod/ packages
+
+	var std []string
+	for _, p := range resolved {
+		if _, ok := stdPackages[filepath.Base(p)]; ok {
+			std = append(std, p)
+		}
+	}
+	sort.Strings(std)
+
+	var local []string
+	for _, p := range resolved {
+		if _, ok := stdPackages[filepath.Base(p)]; !ok {
+			local = append(local, p)
+		}
+	}
+	sort.Strings(local)
+
 	// add single import statements with all resolved imports
 	modAst = astutil.Apply(modAst, func(c astutil.Cursor) bool {
 		switch c.Node().(type) {
 		case *ast.Package:
 			var idecl ast.ImportDecl
 
-			for _, r := range resolved {
+			for _, r := range std {
 				idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
 			}
+			for _, r := range local {
+				idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
+			}
+
 			c.InsertAfter(&idecl)
 			return false
 		}
