@@ -42,7 +42,15 @@ func run() error {
 		case err != nil:
 			return err
 		case dir.IsDir():
-			if err := filepath.Walk(path, visitFile); err != nil {
+			if err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !isCueFile(info) {
+					return nil
+				}
+				return processFile(path)
+			}); err != nil {
 				return err
 			}
 		default:
@@ -52,16 +60,6 @@ func run() error {
 		}
 	}
 	return nil
-}
-
-func visitFile(path string, f os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
-	if !isCueFile(f) {
-		return nil
-	}
-	return processFile(path)
 }
 
 func isCueFile(f os.FileInfo) bool {
@@ -160,7 +158,7 @@ func processContent(filename string, content []byte) ([]byte, error) {
 
 	if len(unresolved) == 0 {
 		// nothing to do
-		return content, nil
+		return insertImports(e, nil)
 	}
 
 	// resolve imports
@@ -437,37 +435,66 @@ func findCueModDir(from string) (string, string, error) {
 	return modDir, module, nil
 }
 
-func insertImports(n *ast.File, resolved map[string]string) ([]byte, error) {
+func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
+	if resolved == nil {
+		resolved = map[string]string{}
+	}
+
 	var modAst ast.Node
 
-	if len(n.Imports) != 0 {
-		// insert resolved identifiers as import statements
-		modAst = astutil.Apply(n, func(c astutil.Cursor) bool {
-			switch x := c.Node().(type) {
-			case *ast.ImportDecl:
-				for _, r := range resolved {
-					x.Specs = append(x.Specs, ast.NewImport(nil, r))
+	var err error
+	if len(f.Imports) != 0 {
+		// filter out unused imports
+		ast.Walk(f, func(n ast.Node) bool {
+			switch x := n.(type) {
+			case *ast.SelectorExpr:
+				xx, ok := x.X.(*ast.Ident)
+				if !ok {
+					return true
 				}
-				return false
+				for _, i := range f.Imports {
+					var p string
+					p, err = strconv.Unquote(i.Path.Value)
+					if err != nil {
+						return false
+					}
+					if xx.Name == filepath.Base(p) {
+						resolved[xx.Name] = p
+					}
+				}
 			}
-			return true
-		}, nil)
-	} else {
-		// add import statements
-		modAst = astutil.Apply(n, func(c astutil.Cursor) bool {
-			switch c.Node().(type) {
-			case *ast.Package:
-				var idecl ast.ImportDecl
 
-				for _, r := range resolved {
-					idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
-				}
-				c.InsertAfter(&idecl)
-				return false
-			}
 			return true
 		}, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	// remove all import statements
+	modAst = astutil.Apply(f, func(c astutil.Cursor) bool {
+		switch c.Node().(type) {
+		case *ast.ImportDecl:
+			c.Delete()
+			return false
+		}
+		return true
+	}, nil)
+
+	// add single import statements with all resolved imports
+	modAst = astutil.Apply(modAst, func(c astutil.Cursor) bool {
+		switch c.Node().(type) {
+		case *ast.Package:
+			var idecl ast.ImportDecl
+
+			for _, r := range resolved {
+				idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
+			}
+			c.InsertAfter(&idecl)
+			return false
+		}
+		return true
+	}, nil)
 
 	return format.Node(modAst)
 }
