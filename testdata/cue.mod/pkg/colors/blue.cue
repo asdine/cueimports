@@ -1,0 +1,3 @@
+package colors
+
+#Blue: "blue"

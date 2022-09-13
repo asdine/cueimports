@@ -1,0 +1,3 @@
+package colors
+
+#Red: "red"

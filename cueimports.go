@@ -324,9 +324,11 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 // it can be either in the current directory or in a parent directory
 func findCueModDir(from string) (string, string, error) {
 	parent := from
+LOOP:
 	for {
+		fmt.Println(parent)
 		if _, err := os.Stat(filepath.Join(parent, "cue.mod")); err == nil {
-			break
+			break LOOP
 		}
 		if parent == "/" {
 			return "", "", nil
