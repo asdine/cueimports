@@ -5,7 +5,7 @@ cueimports is a [CUE](https://github.com/cue-lang/cue) tool that updates your im
 ## Install
 
 ```
-go install github.com/asdine/cueimports
+go install github.com/asdine/cueimports/cmd/cueimports
 ```
 
 ## Usage
