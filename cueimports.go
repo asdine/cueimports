@@ -33,11 +33,15 @@ func Import(filename string, content []byte) ([]byte, error) {
 
 	var f *ast.File
 	var err error
+	opt := []parser.Option{
+		parser.ParseComments,
+		parser.AllowPartial,
+	}
 	// ParseFile is too strict and does not allow passing a nil byte slice
 	if len(content) == 0 {
-		f, err = parser.ParseFile(filename, nil)
+		f, err = parser.ParseFile(filename, nil, opt...)
 	} else {
-		f, err = parser.ParseFile(filename, content)
+		f, err = parser.ParseFile(filename, content, opt...)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
@@ -45,6 +49,7 @@ func Import(filename string, content []byte) ([]byte, error) {
 
 	unresolved := make(map[string][]string, len(f.Unresolved))
 
+	// get a list of all unresolved identifiers
 	ast.Walk(f, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.SelectorExpr:
@@ -219,7 +224,8 @@ func resolveInLocalPackages(unresolved map[string][]string, resolved map[string]
 	}
 
 	if modDir == "" {
-		return fmt.Errorf("could not find cue.mod directory")
+		// if no cue.mod is found, skip
+		return nil
 	}
 
 	errStop := errors.New("stop")
@@ -441,23 +447,36 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 	}
 	sort.Strings(local)
 
+	var idecl ast.ImportDecl
+
+	for _, r := range std {
+		idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
+	}
+	for _, r := range local {
+		idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
+	}
+
+	var inserted bool
 	// add single import statements with all resolved imports
 	modAst = astutil.Apply(modAst, func(c astutil.Cursor) bool {
 		switch c.Node().(type) {
+		case *ast.File:
+			return true
 		case *ast.Package:
-			var idecl ast.ImportDecl
-
-			for _, r := range std {
-				idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
+			if inserted {
+				return false
 			}
-			for _, r := range local {
-				idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
-			}
-
+			inserted = true
 			c.InsertAfter(&idecl)
 			return false
+		default:
+			if inserted {
+				return false
+			}
+			inserted = true
+			c.InsertBefore(&idecl)
+			return false
 		}
-		return true
 	}, nil)
 
 	return format.Node(modAst)

@@ -46,3 +46,103 @@ func TestImport(t *testing.T) {
 		})
 	}
 }
+
+func TestImportInsertPosition(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty file",
+			input: " ",
+			want:  "\n",
+		},
+		{
+			name:  "no package",
+			input: "b: math.Round(1.5)",
+			want: `import "math"
+
+b: math.Round(1.5)
+`,
+		},
+		{
+			name: "with package",
+			input: `package test
+
+			b: math.Round(1.5)
+`,
+			want: `package test
+
+import "math"
+
+b: math.Round(1.5)
+`,
+		},
+		{
+			name: "with comment",
+			input: `package test
+			// some comment
+
+			b: math.Round(1.5)
+`,
+			want: `package test
+
+// some comment
+import "math"
+
+b: math.Round(1.5)
+`,
+		},
+		{
+			name: "with comment at the top",
+			input: `// some comment
+			package test
+
+			b: math.Round(1.5)
+`,
+			want: `// some comment
+package test
+
+import "math"
+
+b: math.Round(1.5)
+`,
+		},
+		{
+			name: "with existing import",
+			input: `import "math"
+
+b: math.Round(1.5)
+`,
+			want: `import "math"
+
+b: math.Round(1.5)
+`,
+		},
+		{
+			name: "with existing different import",
+			input: `import "encoding/json"
+
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+			want: `import (
+	"encoding/json"
+	"math"
+)
+
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := Import("", []byte(tt.input))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, string(res))
+		})
+	}
+}
