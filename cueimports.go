@@ -346,7 +346,6 @@ func findCueModDir(from string) (string, string, error) {
 	}
 LOOP:
 	for {
-		fmt.Println(parent)
 		if _, err := os.Stat(filepath.Join(parent, "cue.mod")); err == nil {
 			break LOOP
 		}
