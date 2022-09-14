@@ -99,7 +99,7 @@ func filterSamePackageIdents(unresolved map[string][]string, filename, packageNa
 			return err
 		}
 
-		if d.IsDir() && d.Name() != dir {
+		if d.IsDir() && path != dir {
 			return filepath.SkipDir
 		}
 
@@ -124,16 +124,19 @@ func filterSamePackageIdents(unresolved map[string][]string, filename, packageNa
 			return nil
 		}
 
-		ast.Walk(f, func(n ast.Node) bool {
-			switch x := n.(type) {
-			case *ast.Ident:
-				if unresolved[x.Name] != nil {
-					delete(unresolved, x.Name)
+		for _, decl := range f.Decls {
+			switch x := decl.(type) {
+
+			case *ast.Field:
+				ident, ok := x.Label.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				if unresolved[ident.Name] != nil {
+					delete(unresolved, ident.Name)
 				}
 			}
-
-			return true
-		}, nil)
+		}
 
 		return nil
 	})
@@ -144,9 +147,6 @@ func filterSamePackageIdents(unresolved map[string][]string, filename, packageNa
 func resolve(unresolved map[string][]string, filename string) (map[string]string, error) {
 	resolved := make(map[string]string)
 
-	// resolve using the stdlib
-	resolveInStdlib(unresolved, resolved)
-
 	if len(unresolved) == 0 {
 		return resolved, nil
 	}
@@ -156,6 +156,9 @@ func resolve(unresolved map[string][]string, filename string) (map[string]string
 	if err != nil {
 		return nil, err
 	}
+
+	// resolve using the stdlib
+	resolveInStdlib(unresolved, resolved)
 
 	return resolved, nil
 }

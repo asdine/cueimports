@@ -24,7 +24,7 @@ func run() error {
 	flag.Parse()
 
 	if flag.NArg() == 0 {
-		if err := processInput(cueimports.StdinFilename, os.Stdin, os.Stdout); err != nil {
+		if err := processInput("", os.Stdin, os.Stdout); err != nil {
 			return err
 		}
 	}

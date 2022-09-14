@@ -25,6 +25,8 @@ func TestImport(t *testing.T) {
 		{"unchanged.cue", true, "unchanged.cue.golden"},
 		{"unused_import.cue", false, "unused_import.cue.golden"},
 		{"unused_import.cue", true, "unused_import.cue.golden"},
+		{"top_level_name_clash.cue", false, "top_level_name_clash.cue.golden"},
+		{"top_level_name_clash.cue", true, "top_level_name_clash.cue.golden"},
 	}
 
 	for _, tt := range tests {
