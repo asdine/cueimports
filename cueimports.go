@@ -17,22 +17,35 @@ import (
 	"cuelang.org/go/cue/parser"
 )
 
-const StdinFilename = "<standard input>"
-
 // Import reads the given cue file and updates the import statements,
 // adding missing ones and removing unused ones.
 // If content is nil, the file is read from disk,
 // otherwise the content is used without reading the file.
 // It returns the update file content.
 func Import(filename string, content []byte) ([]byte, error) {
-	e, err := parser.ParseFile(filename, content)
+	if filename == "" && len(content) == 0 {
+		return nil, errors.New("filename or content must be provided")
+	}
+
+	if filename == "" {
+		filename = "_.cue"
+	}
+
+	var f *ast.File
+	var err error
+	// ParseFile is too strict and does not allow passing a nil byte slice
+	if len(content) == 0 {
+		f, err = parser.ParseFile(filename, nil)
+	} else {
+		f, err = parser.ParseFile(filename, content)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
 
-	unresolved := make(map[string][]string, len(e.Unresolved))
+	unresolved := make(map[string][]string, len(f.Unresolved))
 
-	ast.Walk(e, func(n ast.Node) bool {
+	ast.Walk(f, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.SelectorExpr:
 			xIdent, ok := x.X.(*ast.Ident)
@@ -44,7 +57,7 @@ func Import(filename string, content []byte) ([]byte, error) {
 				return true
 			}
 
-			for _, u := range e.Unresolved {
+			for _, u := range f.Unresolved {
 				if u.Name == xIdent.Name {
 					unresolved[u.Name] = append(unresolved[u.Name], xSel.Name)
 				}
@@ -56,16 +69,14 @@ func Import(filename string, content []byte) ([]byte, error) {
 
 	// Load other files in the same package and filter out unresolved identifiers
 	// that are defined in those files.
-	if filename != StdinFilename {
-		err = filterSamePackageIdents(unresolved, filename, e.PackageName())
-		if err != nil {
-			return nil, err
-		}
+	err = filterSamePackageIdents(unresolved, filename, f.PackageName())
+	if err != nil {
+		return nil, err
 	}
 
 	if len(unresolved) == 0 {
 		// nothing to do
-		return insertImports(e, nil)
+		return insertImports(f, nil)
 	}
 
 	// resolve imports
@@ -75,12 +86,15 @@ func Import(filename string, content []byte) ([]byte, error) {
 	}
 
 	// insert resolved imports
-	return insertImports(e, resolved)
+	return insertImports(f, resolved)
 }
 
 func filterSamePackageIdents(unresolved map[string][]string, filename, packageName string) error {
-	dir := filepath.Dir(filename)
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	dir, err := filepath.Abs(filepath.Dir(filename))
+	if err != nil {
+		return err
+	}
+	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -323,7 +337,10 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 // find the cue.mod directory
 // it can be either in the current directory or in a parent directory
 func findCueModDir(from string) (string, string, error) {
-	parent := from
+	parent, err := filepath.Abs(from)
+	if err != nil {
+		return "", "", err
+	}
 LOOP:
 	for {
 		fmt.Println(parent)
@@ -396,6 +413,10 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 		}
 		return true
 	}, nil)
+
+	if len(resolved) == 0 {
+		return format.Node(modAst)
+	}
 
 	// sort the imports by group
 	// 1. standard library
