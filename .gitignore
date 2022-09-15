@@ -16,3 +16,5 @@ vendor/
 
 # Go workspace (remove the comment below to include it)
 go.work*
+
+dist/
