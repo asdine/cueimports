@@ -21,8 +21,6 @@ $ echo "data: json.Marshal({a: math.Sqrt(7)})" | cueimports
 ```
 
 ```
-package hello
-
 import (
 	"encoding/json"
 	"math"
