@@ -13,6 +13,8 @@ import (
 	"github.com/asdine/cueimports"
 )
 
+var version string = "development"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
@@ -21,7 +23,13 @@ func main() {
 }
 
 func run() error {
+	v := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *v {
+		fmt.Printf("%s\n", version)
+		return nil
+	}
 
 	if flag.NArg() == 0 {
 		if err := processInput("", os.Stdin, os.Stdout); err != nil {
