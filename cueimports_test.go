@@ -158,6 +158,30 @@ c: json.Marshal(1)
 `,
 		},
 		{
+			name: "with custom package",
+			input: `
+a: foo.#Bar
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+			packages: map[string]string{
+				"math": "math",
+				"json": "encoding/json",
+				"foo":  "test.com/foo",
+			},
+			want: `import (
+	"encoding/json"
+	"math"
+	
+	"test.com/foo"
+)
+
+a: foo.#Bar
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+		},
+		{
 			name: "with std package clash",
 			input: `import "encoding/json"
 a: tool.#Foo
@@ -172,6 +196,7 @@ c: json.Marshal(1)
 			want: `import (
 	"encoding/json"
 	"math"
+	
 	"foo.com/tool"
 )
 

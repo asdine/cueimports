@@ -454,6 +454,12 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 	for _, r := range std {
 		idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
 	}
+
+	// add a newline between the stdlib and local imports
+	if len(idecl.Specs) > 0 && len(local) > 0 {
+		idecl.Specs = append(idecl.Specs, &ast.ImportSpec{Path: &ast.BasicLit{}})
+	}
+
 	for _, r := range local {
 		idecl.Specs = append(idecl.Specs, ast.NewImport(nil, r))
 	}
