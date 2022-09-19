@@ -55,7 +55,7 @@ func TestImportInsertPosition(t *testing.T) {
 	}{
 		{
 			name:  "empty file",
-			input: " ",
+			input: "",
 			want:  "\n",
 		},
 		{

@@ -23,7 +23,7 @@ import (
 // otherwise the content is used without reading the file.
 // It returns the update file content.
 func Import(filename string, content []byte) ([]byte, error) {
-	if filename == "" && len(content) == 0 {
+	if filename == "" && content == nil {
 		return nil, errors.New("filename or content must be provided")
 	}
 
@@ -38,7 +38,7 @@ func Import(filename string, content []byte) ([]byte, error) {
 		parser.AllowPartial,
 	}
 	// ParseFile is too strict and does not allow passing a nil byte slice
-	if len(content) == 0 {
+	if content == nil {
 		f, err = parser.ParseFile(filename, nil, opt...)
 	} else {
 		f, err = parser.ParseFile(filename, content, opt...)
