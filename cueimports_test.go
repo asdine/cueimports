@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"cuelang.org/go/cue/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,11 +48,12 @@ func TestImport(t *testing.T) {
 	}
 }
 
-func TestImportInsertPosition(t *testing.T) {
+func TestImportInsertImports(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  string
+		name     string
+		input    string
+		packages map[string]string
+		want     string
 	}{
 		{
 			name:  "empty file",
@@ -61,6 +63,9 @@ func TestImportInsertPosition(t *testing.T) {
 		{
 			name:  "no package",
 			input: "b: math.Round(1.5)",
+			packages: map[string]string{
+				"math": "math",
+			},
 			want: `import "math"
 
 b: math.Round(1.5)
@@ -72,6 +77,9 @@ b: math.Round(1.5)
 
 			b: math.Round(1.5)
 `,
+			packages: map[string]string{
+				"math": "math",
+			},
 			want: `package test
 
 import "math"
@@ -86,6 +94,9 @@ b: math.Round(1.5)
 
 			b: math.Round(1.5)
 `,
+			packages: map[string]string{
+				"math": "math",
+			},
 			want: `package test
 
 // some comment
@@ -101,6 +112,9 @@ b: math.Round(1.5)
 
 			b: math.Round(1.5)
 `,
+			packages: map[string]string{
+				"math": "math",
+			},
 			want: `// some comment
 package test
 
@@ -115,6 +129,9 @@ b: math.Round(1.5)
 
 b: math.Round(1.5)
 `,
+			packages: map[string]string{
+				"math": "math",
+			},
 			want: `import "math"
 
 b: math.Round(1.5)
@@ -127,6 +144,10 @@ b: math.Round(1.5)
 b: math.Round(1.5)
 c: json.Marshal(1)
 `,
+			packages: map[string]string{
+				"math": "math",
+				"json": "encoding/json",
+			},
 			want: `import (
 	"encoding/json"
 	"math"
@@ -136,11 +157,39 @@ b: math.Round(1.5)
 c: json.Marshal(1)
 `,
 		},
+		{
+			name: "with std package clash",
+			input: `import "encoding/json"
+a: tool.#Foo
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+			packages: map[string]string{
+				"math": "math",
+				"json": "encoding/json",
+				"tool": "foo.com/tool",
+			},
+			want: `import (
+	"encoding/json"
+	"math"
+	"foo.com/tool"
+)
+
+a: tool.#Foo
+b: math.Round(1.5)
+c: json.Marshal(1)
+`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := Import("", []byte(tt.input))
+			f, err := parser.ParseFile("", tt.input,
+				parser.ParseComments,
+				parser.AllowPartial,
+			)
+			require.NoError(t, err)
+			res, err := insertImports(f, tt.packages)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, string(res))
 		})

@@ -433,7 +433,9 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 
 	var std []string
 	for _, p := range resolved {
-		if _, ok := stdPackages[filepath.Base(p)]; ok {
+		// ensure the package actually belongs to the stdlib
+		// and not simply ends with the same name
+		if fullName, ok := stdPackages[filepath.Base(p)]; ok && fullName == p {
 			std = append(std, p)
 		}
 	}
@@ -441,7 +443,7 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 
 	var local []string
 	for _, p := range resolved {
-		if _, ok := stdPackages[filepath.Base(p)]; !ok {
+		if fullName, ok := stdPackages[filepath.Base(p)]; !ok || fullName != p {
 			local = append(local, p)
 		}
 	}
