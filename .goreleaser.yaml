@@ -1,6 +1,17 @@
+# Setup verifiable Go builds
+gomod:
+  proxy: true
+  env:
+    - GOPROXY=https://proxy.golang.org,direct
+    - GOSUMDB=sum.golang.org
+  mod: mod
+
+# Download dependencies
 before:
   hooks:
     - go mod tidy
+
+# Build for linux, windows and macos
 builds:
   - id: cueimports
     main: ./cmd/cueimports
@@ -9,7 +20,31 @@ builds:
     goos:
       - linux
       - windows
+  - id: cueimports-macos
+    main: ./cmd/cueimports
+    env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
+
+# Merge arm64 and amd64 macos binaries into one
+universal_binaries:
+  - ids:
+      - cueimports-macos
+    replace: true
+
+  # Sign and notarize macos universal binary
+signs:
+  - signature: "cueimports_macos_universal.zip"
+    ids:
+      - cueimports
+    cmd: gon
+    args:
+      - gon.hcl
+    artifacts: all
+    output: true
+
+# Misc
 archives:
   - replacements:
       darwin: Darwin
@@ -17,6 +52,8 @@ archives:
       windows: Windows
       386: i386
       amd64: x86_64
+
+# Checksum
 checksum:
   name_template: "checksums.txt"
 snapshot:
