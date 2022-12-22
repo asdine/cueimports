@@ -325,6 +325,8 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 							rel = strings.TrimPrefix(rel, "cue.mod/pkg/")
 							rel = strings.TrimPrefix(rel, "cue.mod/usr/")
 							resolved[pkgName] = rel
+						} else if rel != pkgName {
+							resolved[pkgName] = filepath.Join(modName, rel) + ":" + pkgName
 						} else {
 							resolved[pkgName] = filepath.Join(modName, rel)
 						}
