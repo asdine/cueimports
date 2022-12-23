@@ -10,7 +10,15 @@ wall: {
 		w: 150
 		h: 150
 	}
-	priceM2: math.Floor(w * h / 10000)
+	priceM2: math.Floor(size.w * size.h / 10000)
+	objects: [
+		shapes.#Square & {
+			d: {
+				w: 100
+				h: 100
+			}
+		},
+	]
 }
 
 floor: {

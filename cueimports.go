@@ -48,7 +48,6 @@ func Import(filename string, content []byte) ([]byte, error) {
 	}
 
 	unresolved := make(map[string][]string, len(f.Unresolved))
-
 	// get a list of all unresolved identifiers
 	ast.Walk(f, func(n ast.Node) bool {
 		switch x := n.(type) {
@@ -321,11 +320,12 @@ func resolveInPackage(unresolved map[string][]string, resolved map[string]string
 						if err != nil {
 							return false
 						}
+						lastElem := filepath.Base(rel)
 						if strings.HasPrefix(rel, "cue.mod/") {
 							rel = strings.TrimPrefix(rel, "cue.mod/pkg/")
 							rel = strings.TrimPrefix(rel, "cue.mod/usr/")
 							resolved[pkgName] = rel
-						} else if rel != pkgName {
+						} else if lastElem != pkgName {
 							resolved[pkgName] = filepath.Join(modName, rel) + ":" + pkgName
 						} else {
 							resolved[pkgName] = filepath.Join(modName, rel)
@@ -401,7 +401,13 @@ func insertImports(f *ast.File, resolved map[string]string) ([]byte, error) {
 					if err != nil {
 						return false
 					}
-					if xx.Name == filepath.Base(p) {
+					lastElem := filepath.Base(p)
+					// handle package names with a different name
+					// i.e. "test.com/dimensions:alt
+					if idx := strings.Index(lastElem, ":"); idx != -1 {
+						lastElem = lastElem[idx+1:]
+					}
+					if xx.Name == lastElem {
 						resolved[xx.Name] = p
 					}
 				}
