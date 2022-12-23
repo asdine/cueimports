@@ -6,6 +6,10 @@ wall: {
 		w: 100
 		h: 100
 	}
+	altSize: alt.#AltDimensions & {
+		w: 150
+		h: 150
+	}
 	priceM2: math.Floor(w * h / 10000)
 }
 
