@@ -11,7 +11,7 @@ It scans through:
 ## Install
 
 ```bash
-go install github.com/asdine/cueimports/cmd/cueimports
+go install github.com/asdine/cueimports/cmd/cueimports@latest
 ```
 
 ## Usage
